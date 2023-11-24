@@ -2,14 +2,12 @@
 # -*- coding: utf8 -*-
 """
 MFRC522 RFID reader/writer I2C driver in Python 3
+Modified I2C read/write functions for Micropython by felmue
 """
 
-__author__ = "Christoph Pranzl"
-__version__ = "0.0.5"
+__author__ = "Christoph Pranzl, felmue"
+__version__ = "0.0.6"
 __license__ = "GPLv3"
-
-from smbus import SMBus
-
 
 class MFRC522:
     # Define register values from datasheet
@@ -116,9 +114,9 @@ class MFRC522:
 
     MAX_LEN = 16
 
-    def __init__(self, Bus, Address):
-        self.i2cBus = SMBus(Bus)
-        self.i2cAddress = Address
+    def __init__(self, i2c_bus, address=0x28):
+        self._i2c = i2c_bus
+        self._address = address
         self.__MFRC522_init()
 
     def getReaderVersion(self):
@@ -596,14 +594,19 @@ class MFRC522:
         # Activate antenna
         self.__MFRC522_antennaOn()
 
-    def __MFRC522_read(self, address):
+    def __MFRC522_read(self, reg):
         """ Read data from an address on the i2c bus """
-        value = self.i2cBus.read_byte_data(self.i2cAddress, address)
-        return value
+        _buf = bytearray(1)
+        _buf[0] = reg & 0xFF
+        self._i2c.writeto(self._address, _buf)
+        return int.from_bytes(self._i2c.readfrom(self._address, 1), 'little')
 
-    def __MFRC522_write(self, address, value):
+    def __MFRC522_write(self, reg, value):
         """ Write data on an address on the i2c bus """
-        self.i2cBus.write_byte_data(self.i2cAddress, address, value)
+        _buf = bytearray(2)
+        _buf[0] = reg & 0xFF
+        _buf[1] = value & 0xFF
+        self._i2c.writeto(self._address, _buf)
 
     def __MFRC522_setBitMask(self, address, mask):
         """ Set bits according to a mask on a address on the i2c bus """
